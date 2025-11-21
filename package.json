@@ -1,0 +1,16 @@
+{
+  "name": "privacyx-identity-pass",
+  "version": "1.0.0",
+  "description": "**PXP-102 — Privacyx Identity Pass** is a standard for **zero-knowledge identity-based access**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx hardhat test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "hardhat": "^2.27.0"
+  }
+}
