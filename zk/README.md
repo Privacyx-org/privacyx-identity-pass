@@ -114,3 +114,69 @@ _pC = proof.pi_c[0..1]
 _pubSignals = [root, issuerHash, nullifierHash] (converted to uint256)
 
 This mirrors the PXP-101 UX but for identity / personhood instead of balance thresholds.
+
+---
+
+## 4. Example dApp / backend flow with privacyx-sdk
+
+Once a concrete IdentityPass contract and circuit are live, a typical integration
+using the **Privacyx SDK** will look like this (frontend or backend):
+
+```ts
+import { BrowserProvider } from "ethers";
+import { IdentityPass } from "privacyx-sdk";
+
+// 1) Connect wallet / signer
+const provider = new BrowserProvider(window.ethereum);
+const signer = await provider.getSigner();
+
+// 2) Instantiate IdentityPass SDK module
+const idPass = new IdentityPass({
+  chainId: 1, // or your target chain
+  provider,
+  address: "0xIdentityPassContractAddress",
+});
+
+// 3) Load ZK proof & public signals generated off-chain
+//    (shape compatible with `zk/identity_proof.example.json` and
+//     `zk/identity_public.example.json` from this repo)
+import proof from "./identity_proof.json";
+import pubSignalsJson from "./identity_public.json";
+
+// Convert public signals from strings → bigint (as expected on-chain)
+const pubSignals = pubSignalsJson.map((v) => BigInt(v));
+
+// 4) Submit proof on-chain via the SDK
+//    NOTE: For now, IdentityPass.submitProof() in privacyx-sdk is a WIP
+//    and will throw a "not implemented" error until PXP-102 is wired.
+const receipt = await idPass.submitProof(signer, proof, pubSignals);
+
+console.log("IdentityPass tx:", receipt);
+In a Node.js backend (no window.ethereum), you would typically use
+JsonRpcProvider + Wallet instead of BrowserProvider, but the proof
+and pubSignals handling remain the same:
+
+ts
+Copier le code
+import { JsonRpcProvider, Wallet } from "ethers";
+import { IdentityPass } from "privacyx-sdk";
+import proof from "./identity_proof.json";
+import pubSignalsJson from "./identity_public.json";
+
+const provider = new JsonRpcProvider(process.env.RPC_URL);
+const signer = new Wallet(process.env.PRIVATE_KEY, provider);
+
+const idPass = new IdentityPass({
+  chainId: 1,
+  provider,
+  address: process.env.IDENTITY_PASS_ADDRESS!,
+});
+
+const pubSignals = pubSignalsJson.map((v) => BigInt(v));
+
+const receipt = await idPass.submitProof(signer, proof, pubSignals);
+console.log("IdentityPass tx:", receipt);
+Until the PXP-102 contract and circuit are fully wired, these snippets serve as
+API and IO references: the JSON shape and the SDK signatures are stable,
+even if the current implementation throws a "not implemented yet (PXP-102 WIP)"
+error internally.
