@@ -22,3 +22,8 @@ zk/build/
 
 # ZK trusted setup artifacts (PXP-102)
 zk/keys/
+
+# ZK example real artifacts (non-committed, local only)
+zk/identity_proof.real.json
+zk/identity_public.real.json
+
