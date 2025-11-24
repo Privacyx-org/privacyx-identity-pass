@@ -201,7 +201,10 @@ Ces fichiers sont ignorés par Git via .gitignore :
 zk/build/
 ```
 
-📄 ZK IO Format & JSON Examples 
+---
+
+## 📄 ZK IO Format & JSON Examples 
+
 This repository also includes IO format examples (JSON) for PXP-102, aligned
 with snarkjs and the `IdentityPass` contract:
 
@@ -217,6 +220,63 @@ future snarkjs verification implementation,
 
 and alignment with the PrivacyX SDK (`IdentityPass.submitProof(...)`).
 
+---
+
+## 🧪 Local Hardhat demo with Privacyx SDK
+
+This repo ships a small local demo flow wired to the `privacyx-sdk` PXP-102 module.
+
+### 1) Start a local Hardhat node
+
+cd ~/privacyx-identity-pass  
+npx hardhat node  
+
+Keep this terminal open.
+
+### 2) Deploy MockIdentityVerifier + IdentityPass and init issuer/root
+
+In another terminal:
+
+cd ~/privacyx-identity-pass  
+npx hardhat run scripts/deploy-local.js --network localhost  
+
+This will:
+
+- deploy MockIdentityVerifier  
+- deploy IdentityPass with:  
+  - owner = the first Hardhat account  
+  - verifier = the mock verifier  
+- call `setIssuerRoot(...)` with values matching `zk/identity_public.example.json`:  
+  - root = 12345678901234567890  
+  - issuerField = 98765432109876543210  
+  - issuerBytes32 = bytes32(issuerField)
+
+The script prints the deployed IdentityPass address (e.g. `0x...`) and the encoded issuer.
+
+### 3) Run the SDK example
+
+In the `privacyx-sdk` repo, you can run the local PXP-102 example:
+
+cd ~/privacyx-sdk  
+
+export RPC_URL="http://127.0.0.1:8545"  
+export PRIVATE_KEY="0x<Hardhat account private key>"  
+export IDENTITY_PASS_ADDRESS="0x<IdentityPass address from step 2>"  
+
+node examples/identity-pass-local-hardhat.example.mjs
+
+This script will:
+
+- parse the dummy Groth16 proof and public signals  
+- read the current root via `getCurrentRoot(issuerHex)`  
+- check nullifier usage via `isNullifierUsed(nullifierHex)`  
+- submit the proof via `submitProof(...)`  
+- confirm that the nullifier flips from `false` to `true`  
+
+This demonstrates the full PXP-102 pipeline in local dev:
+
+Circom IO → IdentityPass contract → Privacyx SDK → Hardhat node.
+  
 ---
 
 ## 📜 License
