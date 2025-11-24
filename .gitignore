@@ -20,3 +20,5 @@ broadcast/
 # Circom build artifacts
 zk/build/
 
+# ZK trusted setup artifacts (PXP-102)
+zk/keys/
