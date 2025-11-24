@@ -17,3 +17,6 @@ broadcast/
 .env
 .env.*
 
+# Circom build artifacts
+zk/build/
+

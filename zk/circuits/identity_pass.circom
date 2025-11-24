@@ -98,9 +98,9 @@ template IdentityPassSkeleton(nLevels) {
 
     // On se fiche de pathElements / pathIndices pour le moment,
     // mais on les "utilise" pour éviter les warnings.
+    signal unused[nLevels];
     for (var i = 0; i < nLevels; i++) {
-        signal unused;
-        unused <== pathElements[i] + pathIndices[i];
+        unused[i] <== pathElements[i] + pathIndices[i];
     }
 }
 
