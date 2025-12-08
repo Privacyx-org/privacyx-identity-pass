@@ -1,27 +1,58 @@
-# PXP-102: Privacyx Identity Pass
+# PXP-102 — Privacyx Identity Pass
 
-**PXP-102 — Privacyx Identity Pass** is a standard for **zero-knowledge identity-based access**.
+**PXP-102** (Privacyx Identity Pass) is an identity-based access standard powered by zero-knowledge proofs.
 
-It allows users to prove they possess a **valid identity attestation** issued by a trusted provider  
-(KYC, proof-of-personhood, Web2 verifier, etc.) **without revealing who they are, which wallet they use,  
-or any raw personal data.**
+It allows a user to prove they possess a valid identity attestation issued by a trusted provider  
+(KYC service, proof-of-personhood system, Web2 verifier, etc.) **without revealing who they are, which wallet they use, or any raw data**.
 
-This repository contains the **reference smart contracts skeleton** for PXP-102:
+This repository contains:
 
-- `IPxp102IdentityPass.sol` — canonical interface
-- `IdentityPass.sol` — minimal reference implementation (owner-managed issuers + roots, zk verifier hook)
+- the **reference PXP-102 smart contracts** (interface + minimal implementation),
+- a **Hardhat stack** for tests and deployment scripts,
+- **local demo tooling** aligned with the SDK and the Status API.
 
 ---
 
-## 🧱 Standard
+## 🔴 Live deployment & Playground
 
-PXP-102 is part of the **PrivacyX Standards Framework (PXP)**:
+- **Network:** Ethereum mainnet (chainId `1`)
+- **IdentityPass (PXP-102) mainnet:**  
+  `0x2b8899B3ACDe63Fd5ABefa0D75d5982622665498`
 
-- PXP-101 — Balance Pass (implemented & live)
-- **PXP-102 — Identity Pass (this repo)**
-- PXP-103 — Reputation Pass (planned)
+- **Status API (Privacyx reference deployment)**  
+  Base URL: `https://identitypass-api.privacyx.tech`
 
-Draft specification (PXP-102):  
+Main endpoints (examples):
+
+    # Healthcheck
+    curl https://identitypass-api.privacyx.tech/health
+
+    # Demo issuer + nullifier (requires x-api-key in production)
+    curl -H "x-api-key: YOUR_API_KEY" \
+      https://identitypass-api.privacyx.tech/pxp-102/status/default
+
+Generic endpoint:
+
+    curl -H "x-api-key: YOUR_API_KEY" \
+      "https://identitypass-api.privacyx.tech/pxp-102/status?issuer=0xISSUER_BYTES32&nullifier=0xNULLIFIER_BYTES32"
+
+Playground dApp (Status + developer integrations):  
+👉 https://identitypass.privacyx.tech  
+Frontend repo: `Privacyx-org/privacyx-pxp102-dapp`
+
+This repository (`privacyx-identity-pass`) remains the canonical source for PXP-102 contracts and deployment scripts.
+
+---
+
+## 🧱 PXP-102 Standard
+
+PXP-102 is part of the Privacyx Standards Framework (PXP):
+
+- **PXP-101 — Balance Pass** (implemented & live)
+- **PXP-102 — Identity Pass** (this repo)
+- **PXP-103 — Reputation Pass** (planned)
+
+Draft specification:  
 👉 https://github.com/Privacyx-org/privacyx-balance-pass/blob/main/PXP-102.md
 
 ---
@@ -30,116 +61,157 @@ Draft specification (PXP-102):
 
 ### `contracts/IPxp102IdentityPass.sol`
 
-Defines the canonical interface:
+Canonical PXP-102 interface:
 
-- `event IdentityPassUsed(address caller, bytes32 nullifier, bytes32 issuer, uint256 root);`
-- `function getCurrentRoot(bytes32 issuer) external view returns (uint256);`
-- `function isNullifierUsed(bytes32 nullifierHash) external view returns (bool);`
-- `function proveIdentity(...) external;`
+    event IdentityPassUsed(
+        address caller,
+        bytes32 nullifier,
+        bytes32 issuer,
+        uint256 root
+    );
 
-This matches the PXP-102 standard and is meant to be **implementation-agnostic**.
+    function getCurrentRoot(bytes32 issuer) external view returns (uint256);
+    function isNullifierUsed(bytes32 nullifierHash) external view returns (bool);
+    function proveIdentity(...) external;
+
+This interface is implementation-agnostic and defines the minimal surface for a PXP-102 deployment.
 
 ---
 
 ### `contracts/IdentityPass.sol`
 
-Minimal reference implementation skeleton:
+Minimalistic reference implementation:
 
-- Owner-based admin:
-  - `owner` (constructor-injected)
-  - `transferOwnership(address newOwner)`
-- Verifier wiring:
-  - `IIdentityVerifier` interface
-  - `verifier` address (constructor-injected)
-  - `setVerifier(address _verifier)`
-- Issuer & root management:
-  - `mapping(bytes32 => uint256) _issuerRoots`
-  - `setIssuerRoot(bytes32 issuer, uint256 newRoot)`
-  - `getCurrentRoot(bytes32 issuer)`
-- Nullifier tracking:
-  - `mapping(bytes32 => bool) _nullifierUsed`
-  - `isNullifierUsed(bytes32 nullifierHash)`
-- ZK proof consumption:
-  - `proveIdentity(...)`:
-    - expects `pubSignals = [root, issuerHash, nullifierHash]`
-    - checks issuer/root validity
-    - calls `verifier.verifyProof(...)`
-    - marks `nullifierHash` as used
-    - emits `IdentityPassUsed(...)`
+**Admin / Governance**
 
-This contract is intentionally **minimal** and focuses on:
+- `owner` (injected in the constructor)
+- `transferOwnership(address newOwner)`
 
-- correct PXP-102 interface,
-- nullifier anti-replay semantics,
-- issuer/root binding,
-- verifier hook for Groth16 proofs.
+**Verifier (Groth16 / zkSNARK)**
 
-Governance (DAO, multi-sig, external oracle, etc.) is left to concrete deployments.
+- `IIdentityVerifier` interface
+- `verifier` address injected in the constructor
+- `setVerifier(address _verifier)`
 
----
+**Issuer & Merkle root management**
 
-## 🔗 SDK Integration
+- `mapping(bytes32 => uint256) _issuerRoots`
+- `setIssuerRoot(bytes32 issuer, uint256 newRoot)`
+- `getCurrentRoot(bytes32 issuer)`
 
-The **Privacyx SDK** already exposes a PXP-102 IdentityPass module (API surface only):
+**Nullifiers (anti-replay)**
 
-npm: `privacyx-sdk`  
-Repo: https://github.com/Privacyx-org/privacyx-sdk
+- `mapping(bytes32 => bool) _nullifierUsed`
+- `isNullifierUsed(bytes32 nullifierHash)`
 
-```js
-import { IdentityPass } from "privacyx-sdk";
+**Zero-knowledge proof consumption**
 
-const idPass = new IdentityPass({
-  chainId: 1,
-  provider,
-  address: "0xIdentityPassContractAddress",
-});
+- `proveIdentity(...)` expects `pubSignals = [root, issuerHash, nullifierHash]`
+- checks that `root` is consistent with the given issuer
+- calls `verifier.verifyProof(...)`
+- marks `nullifierHash` as used
+- emits `IdentityPassUsed(...)`
 
-// API preview (WIP):
+This implementation focuses on:
 
-await idPass.getCurrentRoot(issuerHex);              // → bigint
-await idPass.isNullifierUsed(nullifierHashHex);      // → boolean
-await idPass.submitProof(signer, proof, [root, issuerHash, nullifierHash]);
-// → TransactionReceipt
+- the canonical shape of PXP-102,
+- anti-replay semantics via the nullifier,
+- the issuer ↔ root binding,
+- the Groth16 verifier hook.
 
-idPass.onIdentityPassUsed((event) => {
-  console.log(event);
-});
-
-Once a concrete PXP-102 deployment is live, this repo and the SDK will be wired to it.
+Real-world governance (DAO, multisig, oracles, etc.) is intentionally left to concrete deployments.
 
 ---
 
-## 🧪 Tooling / build (future)
+## 🔗 SDK & Status API
 
-This repository currently ships **contracts only**.
+### Privacyx SDK
 
-Recommended next steps (not yet included):
+The Privacyx SDK exposes an `IdentityPass` module aligned with this implementation:
 
-- Add a Hardhat or Foundry setup:
-  - compile `IdentityPass.sol`
-  - run unit tests (issuer/root management, nullifier behavior, etc.)
-- Add deployment scripts & example configs (mainnet / testnets).
-- Wire a real Groth16 verifier contract and circuit.
+- npm: `privacyx-sdk`
+- repo: `https://github.com/Privacyx-org/privacyx-sdk`
+
+Example:
+
+    import { JsonRpcProvider } from "ethers";
+    import { IdentityPass } from "privacyx-sdk";
+
+    const provider = new JsonRpcProvider(process.env.RPC_URL);
+
+    const idPass = new IdentityPass({
+      chainId: 1,
+      provider,
+      address: "0x2b8899B3ACDe63Fd5ABefa0D75d5982622665498",
+    });
+
+    // Read-only usage
+    const root = await idPass.getCurrentRoot(issuerHex);
+    const used = await idPass.isNullifierUsed(nullifierHex);
+
+At this stage, `getCurrentRoot` and `isNullifierUsed` are production-ready.  
+Proof submission via `submitProof` is still experimental and will be stabilized in a 0.2.x SDK release.
 
 ---
 
-## 🧮 ZK Circuit (Circom skeleton)
+### PXP-102 Status API
 
-PXP-102 includes a reference Circom circuit, provided as a skeleton, in order to
-fix from now:
+The Status API is a small Express server packaged in `privacyx-sdk`:
 
-- the structure of the inputs,
-- the position of the public signals,
-- the alignment with the `IdentityPass` contract (`_pubSignals[0..2]`).
+- file: `examples/identity-pass-mainnet-status-api.example.mjs`
+- docs: `PXP102_STATUS_API.md` in the `privacyx-sdk` repo
 
-File :
+It exposes:
 
-- `zk/circuits/identity_pass.circom`
+- `GET /health`
+- `GET /pxp-102/status/default`
+- `GET /pxp-102/status?issuer=0x...&nullifier=0x...`
 
-Main template:
+Example (production):
 
-- `IdentityPassSkeleton(32)` — Merkle depth fixed to 32 levels (same as PXP-101)
-- `main` component = `IdentityPassSkeleton(32)`
+    curl -H "x-api-key: YOUR_API_KEY" \
+      "https://identitypass-api.privacyx.tech/pxp-102/status?issuer=0xISSUER&nullifier=0xNULLIFIER"
+
+It integrates cleanly with Web2 backends / API gateways using the `x-api-key` header.
+
+---
+
+## 🧪 Tooling / Hardhat
+
+This repo ships a full Hardhat setup for PXP-102:
+
+- contract compilation
+- local deployment
+- testnet / mainnet deployment scripts
+
+Deployment scripts (examples):
+
+- `scripts/deploy-local.js`
+- `scripts/deploy-sepolia-with-verifier.js`
+- `scripts/deploy-mainnet-with-verifier.js`
+
+Typical workflow:
+
+    # Start a local node
+    npx hardhat node
+
+    # In another terminal: local deployment
+    npx hardhat run scripts/deploy-local.js --network localhost
+
+The scripts:
+
+- deploy a mock verifier + IdentityPass,
+- initialize an issuer + root,
+- print useful addresses (contract, encoded issuer, etc.).
+
+---
+
+## 🧮 ZK Circuit (public skeleton)
+
+This repo includes a pedagogical Circom skeleton circuit for PXP-102:
+
+- file: `zk/circuits/identity_pass.circom`
+- template: `IdentityPassSkeleton(32)` (Merkle depth 32, aligned with PXP-101)
 
 Main inputs:
 
@@ -147,138 +219,95 @@ Main inputs:
 - `issuerHash` — issuer identifier (bytes32 → Fr)
 - `salt` — entropy for the leaf
 - `context` — uniqueness scope (app / epoch / one-shot)
-- `leaf` — canonical commitment (future: Poseidon(isk, issuerHash, salt))
-- `pathElements[32]`, `pathIndices[32]` — Merkle proof (future)
+- `leaf` — canonical commitment
+- `pathElements[32]`, `pathIndices[32]` — Merkle proof
 
 Public signals (outputs):
 
-- `root` — Merkle root of the identity tree (pubSignals[0])
-- `issuerHash_out` — issuer exposed in clear (pubSignals[1])
-- `nullifierHash` — nullifier derived from (isk, issuerHash, context) (pubSignals[2])
+- `root` — Merkle root (pubSignals[0])
+- `issuerHash_out` — issuer (pubSignals[1])
+- `nullifierHash` — derived from `(isk, issuerHash, context)` (pubSignals[2])
 
-⚠️ **Currently (skeleton only):**
+Important:
 
-- `root` is simply copied from `leaf` (no real Merkle proof),
-- `issuerHash_out` is copied from `issuerHash`,
-- `nullifierHash` is a linear combination `isk + issuerHash + context` (not secure),
-- `pathElements` / `pathIndices` are consumed into an `unused[]` array to avoid warnings.
-
-This circuit must **not** be used in production – it is only meant to stabilize
-the API, IO, and the layout of the public signals.
+- the circuit published here is a **reference skeleton**, not hardened,
+- the mainnet circuit used by Privacyx is a separate, hardened private circuit,
+- **never** use this skeleton as-is in production.
 
 ---
 
-## 🔧 Circom build pipeline
+## 🔧 Circom pipeline
 
-An npm command allows you to compile the Circom circuit into standard Groth16
-artifacts (`.r1cs`, `.wasm`, `.sym`):
+Basic compilation:
 
-```bash
-npm run circom:compile
-```
+    npm run circom:compile
 
-Configuration (in package.json):
+`package.json` script:
 
-```jsonc
-"scripts": {
-  "test": "npx hardhat test",
-  "circom:compile": "circom zk/circuits/identity_pass.circom --r1cs --wasm --sym -o zk/build"
-}
-```
+    "scripts": {
+      "circom:compile": "circom zk/circuits/identity_pass.circom --r1cs --wasm --sym -o zk/build"
+    }
 
-Generated outputs:
+Generates:
 
-zk/build/identity_pass.r1cs
+- `zk/build/identity_pass.r1cs`
+- `zk/build/identity_pass_js/identity_pass.wasm`
+- `zk/build/identity_pass.sym`
 
-zk/build/identity_pass_js/identity_pass.wasm
+Git ignores build artifacts via:
 
-zk/build/identity_pass.sym
-
-Ces fichiers sont ignorés par Git via .gitignore :
-
-```gitignore
-# Circom build artifacts
-zk/build/
-```
+    # Circom build artifacts
+    zk/build/
 
 ---
 
-## 📄 ZK IO Format & JSON Examples 
+## 📄 IO JSON & examples
 
-This repository also includes IO format examples (JSON) for PXP-102, aligned
-with snarkjs and the `IdentityPass` contract:
+This repo contains snarkjs-compatible IO examples aligned with the IdentityPass contract:
 
-zk/identity_proof.example.json — Groth16 proof object (`pi_a`, `pi_b`, `pi_c`)
+- `zk/identity_proof.example.json` — Groth16 proof object (`pi_a`, `pi_b`, `pi_c`)
+- `zk/identity_public.example.json` — public signals `[root, issuerHash, nullifierHash]`
 
-zk/identity_public.example.json — public signals [root, issuerHash, nullifierHash]
+They are used by:
 
-These files are reference material for:
-
-dApp / backend integrations,
-
-future snarkjs verification implementation,
-
-and alignment with the PrivacyX SDK (`IdentityPass.submitProof(...)`).
+- backends / dApps integrating PXP-102,
+- `privacyx-sdk` examples,
+- Hardhat demo scripts.
 
 ---
 
-## 🧪 Local Hardhat demo with Privacyx SDK
+## 🧪 Local Hardhat + SDK demo
 
-This repo ships a small local demo flow wired to the `privacyx-sdk` PXP-102 module.
+End-to-end local demo flow:
 
-### 1) Start a local Hardhat node
+1. Start a local node
 
-cd ~/privacyx-identity-pass  
-npx hardhat node  
+       cd ~/privacyx-identity-pass
+       npx hardhat node
 
-Keep this terminal open.
+2. Deploy IdentityPass locally
 
-### 2) Deploy MockIdentityVerifier + IdentityPass and init issuer/root
+       npx hardhat run scripts/deploy-local.js --network localhost
 
-In another terminal:
+3. Run the SDK script in `privacyx-sdk`:
 
-cd ~/privacyx-identity-pass  
-npx hardhat run scripts/deploy-local.js --network localhost  
+       export RPC_URL="http://127.0.0.1:8545"
+       export PRIVATE_KEY="0x..."
+       export IDENTITY_PASS_ADDRESS="0x<local IdentityPass address>"
 
-This will:
+       cd ~/privacyx-sdk
+       node examples/identity-pass-local-hardhat.example.mjs
 
-- deploy MockIdentityVerifier  
-- deploy IdentityPass with:  
-  - owner = the first Hardhat account  
-  - verifier = the mock verifier  
-- call `setIssuerRoot(...)` with values matching `zk/identity_public.example.json`:  
-  - root = 12345678901234567890  
-  - issuerField = 98765432109876543210  
-  - issuerBytes32 = bytes32(issuerField)
+The script demonstrates:
 
-The script prints the deployed IdentityPass address (e.g. `0x...`) and the encoded issuer.
+- reading the root via `getCurrentRoot(issuerHex)`,
+- checking the nullifier via `isNullifierUsed(nullifierHex)`,
+- submitting a demo proof,
+- observing the nullifier flip from `false` → `true`.
 
-### 3) Run the SDK example
-
-In the `privacyx-sdk` repo, you can run the local PXP-102 example:
-
-cd ~/privacyx-sdk  
-
-export RPC_URL="http://127.0.0.1:8545"  
-export PRIVATE_KEY="0x<Hardhat account private key>"  
-export IDENTITY_PASS_ADDRESS="0x<IdentityPass address from step 2>"  
-
-node examples/identity-pass-local-hardhat.example.mjs
-
-This script will:
-
-- parse the dummy Groth16 proof and public signals  
-- read the current root via `getCurrentRoot(issuerHex)`  
-- check nullifier usage via `isNullifierUsed(nullifierHex)`  
-- submit the proof via `submitProof(...)`  
-- confirm that the nullifier flips from `false` to `true`  
-
-This demonstrates the full PXP-102 pipeline in local dev:
-
-Circom IO → IdentityPass contract → Privacyx SDK → Hardhat node.
-  
 ---
 
 ## 📜 License
 
 MIT
+
